@@ -137,11 +137,8 @@ iframe{width:100%;height:520px;border:1px solid var(--line);border-radius:8px;ba
   </nav>
   <div class="panel" id="login" hidden>
     <h2>Accedi <span class="rev"></span></h2>
-    <p class="sub">Inserisci il nome utente ricevuto. Al primo accesso la password è 123.</p>
-    <div class="row"><input type="text" id="aMail" placeholder="Nome utente o email" autocomplete="username" autocapitalize="none"><input type="password" id="pin" placeholder="Password" autocomplete="current-password"><button class="btn pri" id="pinOk">Entra</button><span class="toast" id="pinMsg"></span></div>
-    <button class="del" id="forgot" style="align-self:flex-start;color:var(--acc)">Password dimenticata?</button>
-    <div class="row" id="fgRow" hidden><input type="email" id="fgMail" placeholder="Email collegata all'account"><button class="btn" id="fgSend">Invia link</button><span class="toast" id="fgMsg"></span></div>
-    <p class="sub" id="fgInfo" hidden>Funziona solo se hai collegato la tua email in «Il mio account». Altrimenti chiedi al gestore di reimpostarti la password.</p>
+    <p class="sub">Inserisci il nome utente ricevuto. Al primo accesso la password è 123. Se dimentichi la password chiedi al gestore di reimpostarla.</p>
+    <div class="row"><input type="text" id="aMail" placeholder="Nome utente" autocomplete="username" autocapitalize="none"><input type="password" id="pin" placeholder="Password" autocomplete="current-password"><button class="btn pri" id="pinOk">Entra</button><span class="toast" id="pinMsg"></span></div>
   </div>
   <div class="dl closed" id="fbErr" hidden></div>
   <div class="panel" id="mustPw" hidden>
@@ -229,8 +226,6 @@ iframe{width:100%;height:520px;border:1px solid var(--line);border-radius:8px;ba
       <summary><b>Il mio account</b> · cambia password</summary>
       <div class="row" id="instRow"><button class="btn pri" id="instBtn" hidden>Installa l'app sul telefono</button><span class="sub" id="instIos" hidden>iPhone: in Safari tocca Condividi, poi «Aggiungi alla schermata Home».</span></div>
       <p class="sub" id="accMail"></p>
-      <div class="row"><input type="email" id="lkMail" placeholder="La tua email (per recuperare la password)" autocomplete="email"><button class="btn" id="lkSave">Collega email</button><span class="toast" id="lkMsg"></span></div>
-      <p class="sub">Dopo aver collegato e confermato l'email, accedi con l'email e la tua password. Se dimentichi la password potrai riceverne una nuova per email.</p>
       <div class="row"><input type="password" id="pwOld" placeholder="Password attuale" autocomplete="current-password"><input type="password" id="pwNew" placeholder="Nuova password (min 4)" autocomplete="new-password"><button class="btn" id="pwSave">Cambia password</button><span class="toast" id="pwMsg"></span></div>
     </details>
 </div>
@@ -309,7 +304,8 @@ function tab(t){document.querySelectorAll("nav button[data-t]").forEach(x=>x.set
  ["ord","sum","set","usr"].forEach(x=>$("t-"+x).hidden=x!==t);render()}
 $("admBtn").onclick=()=>{auth&&auth.signOut().then(()=>location.reload())};
 const tryPin=async()=>{if(!auth)return;const raw=$("aMail").value.trim(),pw=$("pin").value;if(!raw||!pw)return;$("pinMsg").textContent="Accesso…";
- const em=raw.includes("@")?raw:fem(raw);
+ let em=raw.includes("@")?raw:fem(raw);
+ try{const m=await db.collection("logins").doc(raw.toLowerCase()).get();if(m.exists&&m.data().email)em=m.data().email}catch(e){}
  try{try{await auth.signInWithEmailAndPassword(em,fpw(pw))}catch(e0){if(e0.code=="auth/too-many-requests")throw e0;await auth.signInWithEmailAndPassword(em,pw)}}
  catch(e){if(raw.toLowerCase()=="admin"&&pw==PW0&&e.code!="auth/too-many-requests"){try{await auth.createUserWithEmailAndPassword(fem("admin"),fpw(PW0))}catch(e2){$("pinMsg").textContent="Nome utente o password errati";return}}
   else{$("pinMsg").textContent=e.code=="auth/too-many-requests"?"Troppi tentativi: riprova tra qualche minuto":"Nome utente o password errati";return}}
@@ -347,9 +343,14 @@ function renderUsers(){if(!ADM)return;
  $("userTbl").querySelectorAll("[data-mk]").forEach(b=>b.onclick=()=>{const u=S.users.find(x=>x.id==b.dataset.mk);mkAccess(u,slug(u.nome),false)});
  $("userTbl").querySelectorAll("[data-ra]").forEach(b=>b.onclick=async()=>{const u=S.users.find(x=>x.id==b.dataset.ra);if(b.dataset.ok!="1"){b.dataset.ok="1";b.textContent="Conferma";return}
   await db.collection("accounts").doc(u.uid).delete().catch(()=>{});delete u.uid;save();$("uMsg").textContent=`Accesso tolto a ${u.nome}`;render()});
- $("userTbl").querySelectorAll("[data-rs]").forEach(b=>b.onclick=()=>{const u=S.users.find(x=>x.id==b.dataset.rs),a=accOf(u);
-  if(a&&a.email){auth.sendPasswordResetEmail(a.email).then(()=>$("uMsg").textContent=`Link per la nuova password inviato a ${a.email}`).catch(e=>$("uMsg").textContent="Errore: "+e.message);return}
-  $("uMsg").innerHTML=`${esc(u.nome)} non ha collegato un'email. Apri la console Firebase → Authentication → Users, elimina l'utente <b>${esc(a.user)}@${DOM}</b>, poi qui premi <b>Togli accesso</b> e <b>Crea accesso</b>: la password tornerà 123.`});
+ $("userTbl").querySelectorAll("[data-rs]").forEach(b=>b.onclick=async()=>{const u=S.users.find(x=>x.id==b.dataset.rs),a=accOf(u);if(!a)return;
+  if(b.dataset.ok!="1"){b.dataset.ok="1";b.textContent="Conferma: password a 123";return}
+  b.disabled=true;$("uMsg").textContent="Reimpostazione…";const n=(a.rv||1)+1,em=a.user+".r"+n+"@"+DOM;let nu;
+  try{nu=(await sa.createUserWithEmailAndPassword(em,fpw(PW0))).user.uid}catch(e){if(e.code=="auth/email-already-in-use"){try{nu=(await sa.signInWithEmailAndPassword(em,fpw(PW0))).user.uid}catch(e2){$("uMsg").textContent="Errore: riprova";b.disabled=false;return}}else{$("uMsg").textContent="Errore: "+(e.message||e);b.disabled=false;return}}
+  await sa.signOut().catch(()=>{});
+  try{const old=u.uid;await db.collection("accounts").doc(nu).set({...a,must:true,rv:n});await db.collection("logins").doc(a.user).set({email:em});await db.collection("accounts").doc(old).delete();
+   u.uid=nu;save();$("uMsg").textContent=`Password di ${u.nome} reimpostata: utente ${a.user}, password ${PW0}`;render()}
+  catch(e){$("uMsg").textContent="Errore: "+e.message;b.disabled=false}});
  $("userTbl").querySelectorAll("[data-adm]").forEach(k=>k.onchange=()=>{const u=S.users.find(x=>x.id==k.dataset.adm);db.collection("accounts").doc(u.uid).update({admin:k.checked}).catch(e=>$("uMsg").textContent="Errore: "+e.message)});
  $("userTbl").querySelectorAll(".del").forEach(b=>b.onclick=async()=>{const u=S.users.find(x=>x.id==b.dataset.id);
   if(b.dataset.ok!="1"){b.dataset.ok="1";b.textContent="Conferma eliminazione";return}
@@ -357,12 +358,12 @@ function renderUsers(){if(!ADM)return;
 async function mkAccess(u,login,adm){login=(login||"").trim().toLowerCase();
  if(!/^[a-z0-9._-]{3,}$/.test(login)){$("uMsg").textContent="Nome utente: almeno 3 caratteri, solo lettere, numeri, punto o trattino";return false}
  if(Object.values(ACC).some(a=>a.user==login)){$("uMsg").textContent=`Il nome utente ${login} è già usato`;return false}
- $("uMsg").textContent="Creazione accesso…";let uid;
- try{uid=(await sa.createUserWithEmailAndPassword(fem(login),fpw(PW0))).user.uid}
- catch(e){if(e.code=="auth/email-already-in-use"){try{uid=(await sa.signInWithEmailAndPassword(fem(login),fpw(PW0))).user.uid}catch(e2){$("uMsg").textContent=`Il nome utente ${login} esiste già su Firebase con un'altra password: eliminalo dalla console (Authentication → Users) o scegline un altro.`;return false}}
-  else{$("uMsg").textContent="Errore: "+(e.message||e);return false}}
+ $("uMsg").textContent="Creazione accesso…";let uid,em=fem(login),rv=1;
+ for(;;){try{uid=(await sa.createUserWithEmailAndPassword(em,fpw(PW0))).user.uid;break}
+  catch(e){if(e.code!="auth/email-already-in-use"){$("uMsg").textContent="Errore: "+(e.message||e);return false}
+   try{uid=(await sa.signInWithEmailAndPassword(em,fpw(PW0))).user.uid;break}catch(e2){rv++;em=login+".r"+rv+"@"+DOM;if(rv>20){$("uMsg").textContent="Errore: riprova";return false}}}}
  await sa.signOut().catch(()=>{});
- try{await db.collection("accounts").doc(uid).set({user:login,nome:u.nome,userId:u.id,admin:!!adm,must:true});
+ try{await db.collection("accounts").doc(uid).set({user:login,nome:u.nome,userId:u.id,admin:!!adm,must:true,rv});await db.collection("logins").doc(login).set({email:em});
   u.uid=uid;save();$("uMsg").textContent=`Accesso creato per ${u.nome}: utente ${login}, password ${PW0}`;render();return true}
  catch(e){$("uMsg").textContent="Errore: "+e.message;return false}}
 $("nUser").oninput=()=>{if(!$("nLogin").dataset.touched)$("nLogin").value=slug($("nUser").value)};
@@ -516,12 +517,6 @@ $("dlN").onchange=()=>{S.dl.n=Math.max(0,+$("dlN").value||0);save();render()};
 $("dlD").onchange=()=>{S.dl.d=+$("dlD").value;save();render()};
 $("relBtn").onclick=()=>{S.rel[K()]=!rel();save();render()};
 document.querySelectorAll(".rev").forEach(x=>x.textContent="v"+APP_VERSION);
-$("forgot").onclick=()=>{$("fgRow").hidden=$("fgInfo").hidden=false;$("fgMail").focus()};
-$("fgSend").onclick=()=>{const e=$("fgMail").value.trim();if(!e.includes("@")){$("fgMsg").textContent="Scrivi un indirizzo email valido";return}
- auth.languageCode="it";auth.sendPasswordResetEmail(e).then(()=>$("fgMsg").textContent="Se l'email è collegata a un account, riceverai un link per la nuova password").catch(()=>$("fgMsg").textContent="Se l'email è collegata a un account, riceverai un link per la nuova password")};
-$("lkSave").onclick=async()=>{const e=$("lkMail").value.trim(),u=auth.currentUser;if(!e.includes("@")){$("lkMsg").textContent="Scrivi un indirizzo email valido";return}
- try{auth.languageCode="it";await u.verifyBeforeUpdateEmail(e);await db.collection("accounts").doc(u.uid).update({email:e});$("lkMsg").textContent="Ti abbiamo inviato un link a "+e+": aprilo per confermare"}
- catch(er){$("lkMsg").textContent=er.code=="auth/requires-recent-login"?"Esci e rientra, poi riprova":"Errore: "+(er.message||er)}};
 if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js",{scope:"/conca/"}).catch(()=>{});
 let _bip=null;window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();_bip=e;$("instBtn").hidden=false});
 $("instBtn").onclick=()=>{if(!_bip)return;_bip.prompt();_bip.userChoice.finally(()=>{_bip=null;$("instBtn").hidden=true})};
