@@ -16,7 +16,7 @@ service cloud.firestore {
         && request.auth.token.email == 'admin@mensa-laconcaverde.it'
         && request.resource.data.admin == true);
       allow update: if isAdmin() || (request.auth != null && request.auth.uid == uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['must']));
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['must','email']));
       allow delete: if isAdmin();
     }
     match /settings/{id} { allow read: if signed(); allow write: if isAdmin(); }

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.0 — 2026-11-04
+- Nome utente automatico: prime tre lettere del nome + prime tre del cognome (es. Mario Rossi → marros), con numero se già usato. Password iniziale 123.
+- Recupero password: in «Il mio account» si collega la propria email; dal login «Password dimenticata?» invia il link per una nuova password. Accesso anche con l'email.
+- Gestori: «Reimposta password» (link via email se collegata, altrimenti istruzioni) e «Togli accesso» nella scheda Utenti.
+- Richiede le nuove regole Firestore (campo email nell'account).
+
 ## 1.0.1 — 2026-11-04
 - Installazione: identità, ambito e service worker propri (id/scope /conca/) per non confondersi con Ergo Plan.
 - Pulsante «Installa l'app sul telefono» (Android/Chrome) e istruzioni per iPhone in «Il mio account».

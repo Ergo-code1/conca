@@ -138,7 +138,10 @@ iframe{width:100%;height:520px;border:1px solid var(--line);border-radius:8px;ba
   <div class="panel" id="login" hidden>
     <h2>Accedi <span class="rev"></span></h2>
     <p class="sub">Inserisci il nome utente ricevuto. Al primo accesso la password è 123.</p>
-    <div class="row"><input type="text" id="aMail" placeholder="Nome utente" autocomplete="username" autocapitalize="none"><input type="password" id="pin" placeholder="Password" autocomplete="current-password"><button class="btn pri" id="pinOk">Entra</button><span class="toast" id="pinMsg"></span></div>
+    <div class="row"><input type="text" id="aMail" placeholder="Nome utente o email" autocomplete="username" autocapitalize="none"><input type="password" id="pin" placeholder="Password" autocomplete="current-password"><button class="btn pri" id="pinOk">Entra</button><span class="toast" id="pinMsg"></span></div>
+    <button class="del" id="forgot" style="align-self:flex-start;color:var(--acc)">Password dimenticata?</button>
+    <div class="row" id="fgRow" hidden><input type="email" id="fgMail" placeholder="Email collegata all'account"><button class="btn" id="fgSend">Invia link</button><span class="toast" id="fgMsg"></span></div>
+    <p class="sub" id="fgInfo" hidden>Funziona solo se hai collegato la tua email in «Il mio account». Altrimenti chiedi al gestore di reimpostarti la password.</p>
   </div>
   <div class="dl closed" id="fbErr" hidden></div>
   <div class="panel" id="mustPw" hidden>
@@ -226,12 +229,14 @@ iframe{width:100%;height:520px;border:1px solid var(--line);border-radius:8px;ba
       <summary><b>Il mio account</b> · cambia password</summary>
       <div class="row" id="instRow"><button class="btn pri" id="instBtn" hidden>Installa l'app sul telefono</button><span class="sub" id="instIos" hidden>iPhone: in Safari tocca Condividi, poi «Aggiungi alla schermata Home».</span></div>
       <p class="sub" id="accMail"></p>
+      <div class="row"><input type="email" id="lkMail" placeholder="La tua email (per recuperare la password)" autocomplete="email"><button class="btn" id="lkSave">Collega email</button><span class="toast" id="lkMsg"></span></div>
+      <p class="sub">Dopo aver collegato e confermato l'email, accedi con l'email e la tua password. Se dimentichi la password potrai riceverne una nuova per email.</p>
       <div class="row"><input type="password" id="pwOld" placeholder="Password attuale" autocomplete="current-password"><input type="password" id="pwNew" placeholder="Nuova password (min 4)" autocomplete="new-password"><button class="btn" id="pwSave">Cambia password</button><span class="toast" id="pwMsg"></span></div>
     </details>
 </div>
 
 <script>
-const APP_VERSION="1.0.1";
+const APP_VERSION="1.1.0";
 const DAYS=["Lun","Mar","Mer","Gio","Ven"],FULL=["Lunedì","Martedì","Mercoledì","Giovedì","Venerdì"];let CATS=["Primi","Secondi","Contorni"];const DEFCATS=[{id:"Primi",n:"Primi"},{id:"Secondi",n:"Secondi"},{id:"Contorni",n:"Contorni"}];const cl=id=>((S.cats||[]).find(c=>c.id==id)||{n:id}).n;
 const ex={dishes:[
 {id:1,n:"Pasta al pomodoro",c:"Primi",d:[1,1,1,1,1]},{id:2,n:"Risotto ai funghi",c:"Primi",d:[1,0,1,0,0]},{id:3,n:"Lasagne",c:"Primi",d:[0,1,0,0,1]},{id:4,n:"Minestrone",c:"Primi",d:[0,0,0,1,0]},
@@ -329,15 +334,22 @@ if(0)document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
 function days(el,cur,fn){el.innerHTML=DAYS.map((d,i)=>`<button class="${i==cur?"on":""}" data-i="${i}">${FULL[i]} ${dt(i)}</button>`).join("");
  el.querySelectorAll("button").forEach(b=>b.onclick=()=>fn(+b.dataset.i))}
 
-const slug=n=>n.normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().trim().replace(/[^a-z0-9]+/g,".").replace(/^\.|\.$/g,"");
+const norm=n=>n.normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z\s]/g,"").trim();
+const slug=n=>{const p=norm(n).split(/\s+/).filter(Boolean);if(!p.length)return"";const b=p[0].slice(0,3)+(p.length>1?p[p.length-1].slice(0,3):"");
+ const used=new Set(Object.values(ACC).map(a=>a.user));let u=b,k=2;while(used.has(u))u=b+k++;return u};
 const accOf=u=>u.uid?ACC[u.uid]:null;
 function renderUsers(){if(!ADM)return;
  const L=[...S.users].sort((a,b)=>cog(a.nome).localeCompare(cog(b.nome),"it"));
  $("uCount").textContent=`${S.users.length} utenti · ${S.users.filter(u=>accOf(u)).length} con accesso`;
  $("userTbl").innerHTML=L.map(u=>{const a=accOf(u),me=u.uid&&auth.currentUser&&u.uid==auth.currentUser.uid;
   return `<div class="ucard"><div><div class="who">${esc(u.nome)}${me?" (tu)":""}</div><div class="sub">${a?"utente "+esc(a.user)+" · "+(a.must?'<span style="color:var(--warn)">password provvisoria</span>':"attivo"):"nessun accesso"}</div></div>
-  <div class="acts">${a?`<label class="opt" style="padding:4px 8px"><input type="checkbox" data-adm="${u.id}" ${a.admin?"checked":""} ${me?"disabled":""}> Gestore</label>`:`<button class="btn" data-mk="${u.id}">Crea accesso</button>`}${me?"":`<button class="del" data-id="${u.id}">Elimina</button>`}</div></div>`}).join("");
+  <div class="acts">${a?`<label class="opt" style="padding:4px 8px"><input type="checkbox" data-adm="${u.id}" ${a.admin?"checked":""} ${me?"disabled":""}> Gestore</label>${me?"":`<button class="btn" data-rs="${u.id}">Reimposta password</button><button class="btn" data-ra="${u.id}">Togli accesso</button>`}`:`<button class="btn" data-mk="${u.id}">Crea accesso</button>`}${me?"":`<button class="del" data-id="${u.id}">Elimina</button>`}</div></div>`}).join("");
  $("userTbl").querySelectorAll("[data-mk]").forEach(b=>b.onclick=()=>{const u=S.users.find(x=>x.id==b.dataset.mk);mkAccess(u,slug(u.nome),false)});
+ $("userTbl").querySelectorAll("[data-ra]").forEach(b=>b.onclick=async()=>{const u=S.users.find(x=>x.id==b.dataset.ra);if(b.dataset.ok!="1"){b.dataset.ok="1";b.textContent="Conferma";return}
+  await db.collection("accounts").doc(u.uid).delete().catch(()=>{});delete u.uid;save();$("uMsg").textContent=`Accesso tolto a ${u.nome}`;render()});
+ $("userTbl").querySelectorAll("[data-rs]").forEach(b=>b.onclick=()=>{const u=S.users.find(x=>x.id==b.dataset.rs),a=accOf(u);
+  if(a&&a.email){auth.sendPasswordResetEmail(a.email).then(()=>$("uMsg").textContent=`Link per la nuova password inviato a ${a.email}`).catch(e=>$("uMsg").textContent="Errore: "+e.message);return}
+  $("uMsg").innerHTML=`${esc(u.nome)} non ha collegato un'email. Apri la console Firebase → Authentication → Users, elimina l'utente <b>${esc(a.user)}@${DOM}</b>, poi qui premi <b>Togli accesso</b> e <b>Crea accesso</b>: la password tornerà 123.`});
  $("userTbl").querySelectorAll("[data-adm]").forEach(k=>k.onchange=()=>{const u=S.users.find(x=>x.id==k.dataset.adm);db.collection("accounts").doc(u.uid).update({admin:k.checked}).catch(e=>$("uMsg").textContent="Errore: "+e.message)});
  $("userTbl").querySelectorAll(".del").forEach(b=>b.onclick=async()=>{const u=S.users.find(x=>x.id==b.dataset.id);
   if(b.dataset.ok!="1"){b.dataset.ok="1";b.textContent="Conferma eliminazione";return}
@@ -504,6 +516,12 @@ $("dlN").onchange=()=>{S.dl.n=Math.max(0,+$("dlN").value||0);save();render()};
 $("dlD").onchange=()=>{S.dl.d=+$("dlD").value;save();render()};
 $("relBtn").onclick=()=>{S.rel[K()]=!rel();save();render()};
 document.querySelectorAll(".rev").forEach(x=>x.textContent="v"+APP_VERSION);
+$("forgot").onclick=()=>{$("fgRow").hidden=$("fgInfo").hidden=false;$("fgMail").focus()};
+$("fgSend").onclick=()=>{const e=$("fgMail").value.trim();if(!e.includes("@")){$("fgMsg").textContent="Scrivi un indirizzo email valido";return}
+ auth.languageCode="it";auth.sendPasswordResetEmail(e).then(()=>$("fgMsg").textContent="Se l'email è collegata a un account, riceverai un link per la nuova password").catch(()=>$("fgMsg").textContent="Se l'email è collegata a un account, riceverai un link per la nuova password")};
+$("lkSave").onclick=async()=>{const e=$("lkMail").value.trim(),u=auth.currentUser;if(!e.includes("@")){$("lkMsg").textContent="Scrivi un indirizzo email valido";return}
+ try{auth.languageCode="it";await u.verifyBeforeUpdateEmail(e);await db.collection("accounts").doc(u.uid).update({email:e});$("lkMsg").textContent="Ti abbiamo inviato un link a "+e+": aprilo per confermare"}
+ catch(er){$("lkMsg").textContent=er.code=="auth/requires-recent-login"?"Esci e rientra, poi riprova":"Errore: "+(er.message||er)}};
 if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js",{scope:"/conca/"}).catch(()=>{});
 let _bip=null;window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();_bip=e;$("instBtn").hidden=false});
 $("instBtn").onclick=()=>{if(!_bip)return;_bip.prompt();_bip.userChoice.finally(()=>{_bip=null;$("instBtn").hidden=true})};
