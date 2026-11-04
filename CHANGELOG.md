@@ -1,11 +1,6 @@
 # Changelog
 
-Formato: versione MAGGIORE.MINORE.CORREZIONE
-- MAGGIORE: cambi che richiedono nuove regole Firebase o modifiche ai dati
-- MINORE: nuove funzioni
-- CORREZIONE: correzioni e ritocchi grafici
-
-## 1.0.0 – 2026-11-04
+## 1.0.0 — 2026-11-04
 Prima versione pubblicata.
 - Accesso con nome utente e password (123 al primo accesso, poi cambio obbligatorio); l'accesso resta attivo sul dispositivo.
 - Prenotazione dei piatti per giorno, in azienda o al ristorante; nome collegato all'utente; scelte salvate e modificabili fino alla chiusura.
