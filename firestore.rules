@@ -1,0 +1,39 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signed() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/accounts/$(request.auth.uid));
+    }
+    function acc() {
+      return get(/databases/$(database)/documents/accounts/$(request.auth.uid)).data;
+    }
+    function isAdmin() { return signed() && acc().admin == true; }
+
+    match /accounts/{uid} {
+      allow read: if request.auth != null && (request.auth.uid == uid || isAdmin());
+      allow create: if isAdmin() || (request.auth != null && request.auth.uid == uid
+        && request.auth.token.email == 'admin@mensa-laconcaverde.it'
+        && request.resource.data.admin == true);
+      allow update: if isAdmin() || (request.auth != null && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['must']));
+      allow delete: if isAdmin();
+    }
+    match /settings/{id} { allow read: if signed(); allow write: if isAdmin(); }
+    match /dishes/{id}   { allow read: if signed(); allow write: if isAdmin(); }
+    match /users/{id}    { allow read: if isAdmin(); allow write: if isAdmin(); }
+    match /orders/{id} {
+      allow read: if isAdmin() || (signed() && resource.data.uid == acc().userId);
+      allow create: if isAdmin() || (signed() && okOrder());
+      allow update: if isAdmin() || (signed() && okOrder() && resource.data.uid == acc().userId);
+      allow delete: if isAdmin();
+    }
+    function okOrder() {
+      return request.resource.data.uid == acc().userId
+        && request.resource.data.keys().hasOnly(['uid','nome','day','wk','dove','s','assente'])
+        && request.resource.data.dove in ['Azienda','Ristorante']
+        && request.resource.data.day is int && request.resource.data.day >= 0 && request.resource.data.day <= 4
+        && get(/databases/$(database)/documents/settings/main).data.rel[request.resource.data.wk] == true;
+    }
+  }
+}
