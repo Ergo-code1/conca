@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.1 — 2026-11-04
+- Installazione: identità, ambito e service worker propri (id/scope /conca/) per non confondersi con Ergo Plan.
+- Pulsante «Installa l'app sul telefono» (Android/Chrome) e istruzioni per iPhone in «Il mio account».
+
 ## 1.0.0 — 2026-11-04
 Prima versione pubblicata.
 - Accesso con nome utente e password (123 al primo accesso, poi cambio obbligatorio); l'accesso resta attivo sul dispositivo.

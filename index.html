@@ -1,6 +1,6 @@
 <!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Mensa La Conca Verde</title>
-<link rel="icon" href="favicon.png"><link rel="apple-touch-icon" href="apple-touch-icon.png"><link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="favicon.png"><link rel="apple-touch-icon" href="apple-touch-icon.png"><link rel="manifest" href="manifest.webmanifest?v=2">
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="La Conca Verde"><meta name="theme-color" content="#184d2f">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Work+Sans:wght@400;500;600&display=swap">
@@ -224,13 +224,14 @@ iframe{width:100%;height:520px;border:1px solid var(--line);border-radius:8px;ba
   </section>
 <details class="panel" id="accBox" hidden>
       <summary><b>Il mio account</b> · cambia password</summary>
+      <div class="row" id="instRow"><button class="btn pri" id="instBtn" hidden>Installa l'app sul telefono</button><span class="sub" id="instIos" hidden>iPhone: in Safari tocca Condividi, poi «Aggiungi alla schermata Home».</span></div>
       <p class="sub" id="accMail"></p>
       <div class="row"><input type="password" id="pwOld" placeholder="Password attuale" autocomplete="current-password"><input type="password" id="pwNew" placeholder="Nuova password (min 4)" autocomplete="new-password"><button class="btn" id="pwSave">Cambia password</button><span class="toast" id="pwMsg"></span></div>
     </details>
 </div>
 
 <script>
-const APP_VERSION="1.0.0";
+const APP_VERSION="1.0.1";
 const DAYS=["Lun","Mar","Mer","Gio","Ven"],FULL=["Lunedì","Martedì","Mercoledì","Giovedì","Venerdì"];let CATS=["Primi","Secondi","Contorni"];const DEFCATS=[{id:"Primi",n:"Primi"},{id:"Secondi",n:"Secondi"},{id:"Contorni",n:"Contorni"}];const cl=id=>((S.cats||[]).find(c=>c.id==id)||{n:id}).n;
 const ex={dishes:[
 {id:1,n:"Pasta al pomodoro",c:"Primi",d:[1,1,1,1,1]},{id:2,n:"Risotto ai funghi",c:"Primi",d:[1,0,1,0,0]},{id:3,n:"Lasagne",c:"Primi",d:[0,1,0,0,1]},{id:4,n:"Minestrone",c:"Primi",d:[0,0,0,1,0]},
@@ -503,6 +504,10 @@ $("dlN").onchange=()=>{S.dl.n=Math.max(0,+$("dlN").value||0);save();render()};
 $("dlD").onchange=()=>{S.dl.d=+$("dlD").value;save();render()};
 $("relBtn").onclick=()=>{S.rel[K()]=!rel();save();render()};
 document.querySelectorAll(".rev").forEach(x=>x.textContent="v"+APP_VERSION);
+if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js",{scope:"/conca/"}).catch(()=>{});
+let _bip=null;window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();_bip=e;$("instBtn").hidden=false});
+$("instBtn").onclick=()=>{if(!_bip)return;_bip.prompt();_bip.userChoice.finally(()=>{_bip=null;$("instBtn").hidden=true})};
+if(/iphone|ipad|ipod/i.test(navigator.userAgent)&&!navigator.standalone)$("instIos").hidden=false;
 if(!db)fbErr("Firebase non configurato: compila il file firebase-config.js");
 else{auth.onAuthStateChanged(async u=>{
  accUnsub&&accUnsub();accUnsub=null;ME=null;
