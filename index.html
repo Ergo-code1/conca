@@ -188,10 +188,11 @@ iframe{width:100%;height:520px;border:1px solid var(--line);border-radius:8px;ba
       <div class="row">
         <select id="rPer" aria-label="Periodo"><option value="d">Giorno selezionato</option><option value="w" selected>Settimana visualizzata</option><option value="m">Mese</option></select>
         <input type="month" id="rMonth" hidden aria-label="Mese">
+        <div class="seg"><label><input type="radio" name="rCnt" value="all" checked> Completo</label><label><input type="radio" name="rCnt" value="sum"> Solo riassunto</label></div>
         <div class="seg"><label><input type="radio" name="rFmt" value="pdf" checked> PDF</label><label><input type="radio" name="rFmt" value="xlsx"> Excel</label></div>
       </div>
       <div class="row"><button class="btn pri" id="rShare">Invia (WhatsApp, Mail…)</button><button class="btn" id="rDown">Scarica</button><span class="toast" id="rMsg"></span></div>
-      <p class="sub">Il riepilogo contiene per ogni persona i pasti in azienda, al ristorante e le disdette, i totali per giorno e il dettaglio delle scelte.</p>
+      <p class="sub"><b>Solo riassunto</b>: per ogni persona i pasti consumati (totale, in azienda, al ristorante). <b>Completo</b>: aggiunge disdette, totali per giorno, piatti e dettaglio delle scelte.</p>
     </div>
     <iframe id="pdfView" hidden title="Anteprima PDF"></iframe>
   </section>
@@ -244,7 +245,7 @@ iframe{width:100%;height:520px;border:1px solid var(--line);border-radius:8px;ba
 <div class="instbar" id="instBar" hidden><span id="instTxt">Installa l'app Mensa La Conca Verde</span><button class="btn pri" id="instBtn">Installa</button><button class="instx" id="instX" aria-label="Chiudi">✕</button></div>
 
 <script>
-const APP_VERSION="1.2.0";
+const APP_VERSION="1.3.0";
 const DAYS=["Lun","Mar","Mer","Gio","Ven"],FULL=["Lunedì","Martedì","Mercoledì","Giovedì","Venerdì"];let CATS=["Primi","Secondi","Contorni"];const DEFCATS=[{id:"Primi",n:"Primi"},{id:"Secondi",n:"Secondi"},{id:"Contorni",n:"Contorni"}];const cl=id=>((S.cats||[]).find(c=>c.id==id)||{n:id}).n;
 const ex={dishes:[
 {id:1,n:"Pasta al pomodoro",c:"Primi",d:[1,1,1,1,1]},{id:2,n:"Risotto ai funghi",c:"Primi",d:[1,0,1,0,0]},{id:3,n:"Lasagne",c:"Primi",d:[0,1,0,0,1]},{id:4,n:"Minestrone",c:"Primi",d:[0,0,0,1,0]},
@@ -499,6 +500,16 @@ function repData(){const os=[...RD.orders].sort((a,b)=>dateOf(a)-dateOf(b)||cog(
  const fname="riepilogo_mensa_"+(p=="d"?K()+"_"+DAYS[dS]:p=="w"?"settimana_"+K():$("rMonth").value);
  return {os,pers,giorni,piatti,label,fname}}
 function sum3(a){return a.reduce((t,x)=>({A:t.A+x.A,R:t.R+x.R,D:t.D+x.D}),{A:0,R:0,D:0})}
+const onlySum=()=>document.querySelector('input[name="rCnt"]:checked').value=="sum";
+function makePdfSum(R){const {jsPDF}=window.jspdf,doc=new jsPDF();const H={fillColor:[24,77,47],textColor:[212,180,106]},T={fontStyle:"bold",fillColor:[239,230,200]};
+ const P=R.pers.filter(p=>p.A+p.R>0),tp=sum3(P);
+ doc.setFontSize(16);doc.text("La Conca Verde – Riassunto pasti",14,16);doc.setFontSize(11);doc.text(R.label.charAt(0).toUpperCase()+R.label.slice(1),14,23);
+ doc.autoTable({startY:30,head:[["Nome","Totale pasti","In azienda","Al ristorante"]],body:[...P.map(p=>[p.nome,p.A+p.R,p.A,p.R]),[{content:"Totale",styles:T},{content:tp.A+tp.R,styles:T},{content:tp.A,styles:T},{content:tp.R,styles:T}]],headStyles:H,columnStyles:{1:{halign:"center",fontStyle:"bold"},2:{halign:"center"},3:{halign:"center"}}});
+ return new File([doc.output("blob")],R.fname+"_riassunto.pdf",{type:"application/pdf"})}
+function makeXlsxSum(R){const wb=XLSX.utils.book_new(),P=R.pers.filter(p=>p.A+p.R>0),tp=sum3(P);
+ const ws=XLSX.utils.aoa_to_sheet([["Riassunto pasti "+R.label],[],["Nome","Totale pasti","In azienda","Al ristorante"],...P.map(p=>[p.nome,p.A+p.R,p.A,p.R]),["Totale",tp.A+tp.R,tp.A,tp.R]]);
+ ws["!cols"]=[{wch:26},{wch:13},{wch:11},{wch:13}];XLSX.utils.book_append_sheet(wb,ws,"Riassunto");
+ return new File([XLSX.write(wb,{type:"array",bookType:"xlsx"})],R.fname+"_riassunto.xlsx",{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"})}
 function makePdf(R){const {jsPDF}=window.jspdf,doc=new jsPDF();const H={fillColor:[24,77,47],textColor:[212,180,106]},T={fontStyle:"bold",fillColor:[239,230,200]};
  doc.setFontSize(16);doc.text("La Conca Verde – Riepilogo mensa",14,16);doc.setFontSize(11);doc.text(R.label.charAt(0).toUpperCase()+R.label.slice(1),14,23);
  const tp=sum3(R.pers);doc.setFontSize(10);doc.text(`Pasti ${tp.A+tp.R} · In azienda ${tp.A} · Al ristorante ${tp.R} · Disdetti ${tp.D}`,14,29);
@@ -522,7 +533,7 @@ function buildFile(){prepReport();if(!RD.orders){$("rMsg").textContent="Sto cari
  const f=document.querySelector('input[name="rFmt"]:checked').value;
  if(f=="pdf"&&!(window.jspdf&&window.jspdf.jsPDF)){$("rMsg").textContent="Libreria PDF non caricata: controlla la connessione";return null}
  if(f=="xlsx"&&!window.XLSX){$("rMsg").textContent="Libreria Excel non caricata: controlla la connessione";return null}
- return {file:f=="pdf"?makePdf(R):makeXlsx(R),R}}
+ const sm=onlySum();return {file:f=="pdf"?(sm?makePdfSum(R):makePdf(R)):(sm?makeXlsxSum(R):makeXlsx(R)),R}}
 function download(file){const u=URL.createObjectURL(file),a=document.createElement("a");a.href=u;a.download=file.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000)}
 $("rDown").onclick=()=>{const b=buildFile();if(!b)return;download(b.file);$("rMsg").textContent="Scaricato: "+b.file.name};
 $("rShare").onclick=()=>{const b=buildFile();if(!b)return;

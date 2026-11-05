@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.3.0 — 2026-11-05
+- Invia riepilogo: scelta «Solo riassunto» (per persona: totale pasti consumati, in azienda, al ristorante, con totale generale) oppure «Completo»; disponibile in PDF ed Excel per giorno, settimana o mese.
+
 ## 1.2.0 — 2026-11-05
 - Prenota: al salvataggio o alla modifica della scelta, e al cambio presenza/assenza, compare il simbolo di caricamento e poi la spunta ✓ «Scelta salvata»; in caso di problemi di rete un avviso «Non salvato».
 
