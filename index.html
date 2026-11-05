@@ -124,6 +124,15 @@ details.panel summary{cursor:pointer}
 .instbar span{flex:1;min-width:0;font-size:.9rem}
 .instbar .btn{background:#c9a85a;color:#184d2f;border-color:#c9a85a}
 .instx{background:none;border:none;color:#efe6c8;font-size:1.1rem;cursor:pointer;padding:4px 6px}
+.fb{display:inline-flex;align-items:center;gap:8px;font-weight:600;color:var(--mut);padding:6px 12px;border-radius:999px;background:var(--acc2)}
+.fb.ok{color:var(--acc);background:var(--acc2)}
+.fb.ko{color:var(--warn)}
+.spin{width:16px;height:16px;border:2.5px solid var(--line);border-top-color:var(--acc);border-radius:50%;animation:sp .8s linear infinite;flex:none}
+.tick{display:inline-flex;width:22px;height:22px;border-radius:50%;background:var(--acc);color:var(--bg);align-items:center;justify-content:center;font-size:.85rem;flex:none;animation:pop .25s ease-out}
+.fb.ko .tick{background:var(--warn)}
+@keyframes sp{to{transform:rotate(360deg)}}
+@keyframes pop{from{transform:scale(.4)}to{transform:scale(1)}}
+@media (prefers-reduced-motion:reduce){.spin{animation-duration:2s}.tick{animation:none}}
 .grp{background:var(--acc2);font-weight:600;color:var(--acc)}
 .del{background:none;border:none;color:var(--warn);cursor:pointer;font:inherit}
 iframe{width:100%;height:520px;border:1px solid var(--line);border-radius:8px;background:#fff}
@@ -235,7 +244,7 @@ iframe{width:100%;height:520px;border:1px solid var(--line);border-radius:8px;ba
 <div class="instbar" id="instBar" hidden><span id="instTxt">Installa l'app Mensa La Conca Verde</span><button class="btn pri" id="instBtn">Installa</button><button class="instx" id="instX" aria-label="Chiudi">✕</button></div>
 
 <script>
-const APP_VERSION="1.1.1";
+const APP_VERSION="1.2.0";
 const DAYS=["Lun","Mar","Mer","Gio","Ven"],FULL=["Lunedì","Martedì","Mercoledì","Giovedì","Venerdì"];let CATS=["Primi","Secondi","Contorni"];const DEFCATS=[{id:"Primi",n:"Primi"},{id:"Secondi",n:"Secondi"},{id:"Contorni",n:"Contorni"}];const cl=id=>((S.cats||[]).find(c=>c.id==id)||{n:id}).n;
 const ex={dishes:[
 {id:1,n:"Pasta al pomodoro",c:"Primi",d:[1,1,1,1,1]},{id:2,n:"Risotto ai funghi",c:"Primi",d:[1,0,1,0,0]},{id:3,n:"Lasagne",c:"Primi",d:[0,1,0,0,1]},{id:4,n:"Minestrone",c:"Primi",d:[0,0,0,1,0]},
@@ -245,6 +254,12 @@ orders:[]};
 let S={dishes:[],users:[],orders:[]};
 S.rel={};S.dl=S.dl||{mode:"giorni",n:1,h:"12:00",d:-3};S.av=S.av||{};S.cats=JSON.parse(JSON.stringify(DEFCATS));
 let ADM=false;
+let fbT=0;
+function busy(t){clearTimeout(fbT);const m=$("msg");m.className="fb";m.innerHTML=`<span class="spin" aria-hidden="true"></span>${t}`}
+function done(t){const m=$("msg");m.className="fb ok";m.innerHTML=`<span class="tick" aria-hidden="true">✓</span>${t}`;clearTimeout(fbT);fbT=setTimeout(()=>{m.className="toast";m.textContent=""},3500)}
+function fail(t){const m=$("msg");m.className="fb ko";m.innerHTML=`<span class="tick" aria-hidden="true">!</span>${t}`}
+function track(p,okT){busy("Salvataggio in corso…");$("save").disabled=true;
+ return p.then(()=>done(okT)).catch(e=>fail("Non salvato: controlla la connessione e riprova")).finally(()=>{$("save").disabled=false;renderOrd()})}
 const fbErr=t=>{$("fbErr").textContent=t;$("fbErr").hidden=!t};
 const sj=v=>v&&typeof v=="object"?(Array.isArray(v)?"["+v.map(sj).join(",")+"]":"{"+Object.keys(v).sort().map(k=>JSON.stringify(k)+":"+sj(v[k])).join(",")+"}"):JSON.stringify(v);
 const oid=o=>`${o.wk}_${o.day}_${o.uid}`,sid=x=>String(x.id);
@@ -255,13 +270,13 @@ let FOR=0;const myId=()=>ADM&&FOR?FOR:(ME&&ME.userId?ME.userId:0);
 const DOM="mensa-laconcaverde.it",PW0="123",fem=u=>u.trim().toLowerCase()+"@"+DOM,fpw=p=>"mc#"+p;
 try{firebase.initializeApp(window.FIREBASE_CONFIG);db=firebase.firestore();auth=firebase.auth();
  sa=firebase.initializeApp(window.FIREBASE_CONFIG,"sec").auth();sa.setPersistence(firebase.auth.Auth.Persistence.NONE).catch(()=>{})}catch(e){}
-function save(){if(!db)return;const b=db.batch();let n=0;
+function save(){if(!db)return Promise.resolve();const b=db.batch();let n=0;
  const cols=ADM?[["dishes",sid],["users",sid],["orders",oid]]:[["orders",oid]];
  cols.forEach(([k,idf])=>{const cur={};S[k].forEach(x=>cur[idf(x)]=x);
   for(const id in cur){const j=sj(cur[id]);if(last[k][id]!==j){b.set(db.collection(k).doc(id),JSON.parse(JSON.stringify(cur[id])));last[k][id]=j;n++}}
   for(const id in last[k])if(!(id in cur)){b.delete(db.collection(k).doc(id));delete last[k][id];n++}});
  if(ADM){const st={rel:S.rel,dl:S.dl,av:S.av,cats:S.cats},j=sj(st);if(j!==last.settings){b.set(db.doc("settings/main"),JSON.parse(JSON.stringify(st)));last.settings=j;n++}}
- if(n)b.commit().catch(e=>fbErr("Salvataggio non riuscito: "+e.message))}
+ if(!n)return Promise.resolve();return b.commit().catch(e=>{fbErr("Salvataggio non riuscito: "+e.message);throw e})}
 let ordUnsub=null,ordKey="";
 function subOrders(){const key=(ADM?"A":"U"+myOwn())+"|"+K();if(key==ordKey)return;ordKey=key;ordUnsub&&ordUnsub();
  let q=db.collection("orders").where("wk","==",K());if(!ADM)q=q.where("uid","==",myOwn());
@@ -408,12 +423,12 @@ $("save").onclick=()=>{if(!ADM&&(!rel()||new Date()>deadline(dO))){$("msg").text
  const s={};CATS.forEach(c=>{const v=document.querySelector(`input[name="c-${c}"]:checked`).value;if(v)s[c]=+v});
  if(!Object.keys(s).length){$("msg").textContent="Scegli almeno una portata";return}
  const had=S.orders.some(o=>o.uid==uid&&o.day==dO&&o.wk==K());S.orders=S.orders.filter(o=>!(o.uid==uid&&o.day==dO&&o.wk==K()));
- S.orders.push({uid,nome,day:dO,wk:K(),assente:false,dove:document.querySelector('input[name="dove"]:checked').value,s});save();
- $("msg").textContent=`${had?"Scelta modificata":"Scelta salvata"} per ${FULL[dO]}`;renderOrd();setTimeout(()=>$("msg").textContent="",2500)};
+ S.orders.push({uid,nome,day:dO,wk:K(),assente:false,dove:document.querySelector('input[name="dove"]:checked').value,s});const pr=save();
+ track(pr,`${had?"Scelta modificata":"Scelta salvata"} per ${FULL[dO]}`)};
 
 document.addEventListener("change",e=>{if(e.target.name!="pres")return;const o=S.orders.find(o=>o.uid==myId()&&o.day==dO&&o.wk==K());
  const toAbs=e.target.value=="1",now=new Date();
- if(!o||(!ADM&&(toAbs?now>dayEnd(dO):now>deadline(dO)))){renderOrd();return}o.assente=toAbs;save();$("msg").textContent=o.assente?`Assenza segnata per ${FULL[dO]}`:`Presenza confermata per ${FULL[dO]}`;renderOrd();renderSum()});
+ if(!o||(!ADM&&(toAbs?now>dayEnd(dO):now>deadline(dO)))){renderOrd();return}o.assente=toAbs;renderOrd();renderSum();track(save(),o.assente?`Assenza segnata per ${FULL[dO]}`:`Presenza confermata per ${FULL[dO]}`)});
 function counts(day){const r={};CATS.forEach(c=>r[c]={});S.orders.filter(o=>o.day==day&&o.wk==K()).forEach(o=>CATS.forEach(c=>{if(o.s[c]){const k=o.s[c];r[c][k]=r[c][k]||{A:0,R:0,D:0};r[c][k][o.assente?"D":o.dove[0]]++}}));return r}
 
 function renderSum(){days($("dSum"),dS,i=>{dS=i;renderSum()});

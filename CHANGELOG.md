@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.2.0 — 2026-11-05
+- Prenota: al salvataggio o alla modifica della scelta, e al cambio presenza/assenza, compare il simbolo di caricamento e poi la spunta ✓ «Scelta salvata»; in caso di problemi di rete un avviso «Non salvato».
+
 ## 1.1.1 — 2026-11-05
 - Installazione come Ergo Plan: barra «Installa» in basso (Android/Chrome) al posto del menu ⋮; su iPhone istruzioni Condividi → Aggiungi alla schermata Home; la barra non compare se l'app è già aperta come app installata e si chiude con ✕.
 
