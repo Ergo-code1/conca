@@ -120,6 +120,10 @@ details.panel summary{cursor:pointer}
 .ok{color:var(--acc)}
 .rev{font-family:var(--body);font-size:.75rem;font-weight:500;color:var(--mut)}
 .brand .rev{position:absolute;left:10px;top:10px;color:#d9c38a}
+.instbar{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;gap:10px;align-items:center;background:#184d2f;color:#efe6c8;padding:10px max(16px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.instbar span{flex:1;min-width:0;font-size:.9rem}
+.instbar .btn{background:#c9a85a;color:#184d2f;border-color:#c9a85a}
+.instx{background:none;border:none;color:#efe6c8;font-size:1.1rem;cursor:pointer;padding:4px 6px}
 .grp{background:var(--acc2);font-weight:600;color:var(--acc)}
 .del{background:none;border:none;color:var(--warn);cursor:pointer;font:inherit}
 iframe{width:100%;height:520px;border:1px solid var(--line);border-radius:8px;background:#fff}
@@ -224,14 +228,14 @@ iframe{width:100%;height:520px;border:1px solid var(--line);border-radius:8px;ba
   </section>
 <details class="panel" id="accBox" hidden>
       <summary><b>Il mio account</b> · cambia password</summary>
-      <div class="row" id="instRow"><button class="btn pri" id="instBtn" hidden>Installa l'app sul telefono</button><span class="sub" id="instIos" hidden>iPhone: in Safari tocca Condividi, poi «Aggiungi alla schermata Home».</span></div>
       <p class="sub" id="accMail"></p>
       <div class="row"><input type="password" id="pwOld" placeholder="Password attuale" autocomplete="current-password"><input type="password" id="pwNew" placeholder="Nuova password (min 4)" autocomplete="new-password"><button class="btn" id="pwSave">Cambia password</button><span class="toast" id="pwMsg"></span></div>
     </details>
 </div>
+<div class="instbar" id="instBar" hidden><span id="instTxt">Installa l'app Mensa La Conca Verde</span><button class="btn pri" id="instBtn">Installa</button><button class="instx" id="instX" aria-label="Chiudi">✕</button></div>
 
 <script>
-const APP_VERSION="1.1.0";
+const APP_VERSION="1.1.1";
 const DAYS=["Lun","Mar","Mer","Gio","Ven"],FULL=["Lunedì","Martedì","Mercoledì","Giovedì","Venerdì"];let CATS=["Primi","Secondi","Contorni"];const DEFCATS=[{id:"Primi",n:"Primi"},{id:"Secondi",n:"Secondi"},{id:"Contorni",n:"Contorni"}];const cl=id=>((S.cats||[]).find(c=>c.id==id)||{n:id}).n;
 const ex={dishes:[
 {id:1,n:"Pasta al pomodoro",c:"Primi",d:[1,1,1,1,1]},{id:2,n:"Risotto ai funghi",c:"Primi",d:[1,0,1,0,0]},{id:3,n:"Lasagne",c:"Primi",d:[0,1,0,0,1]},{id:4,n:"Minestrone",c:"Primi",d:[0,0,0,1,0]},
@@ -518,9 +522,14 @@ $("dlD").onchange=()=>{S.dl.d=+$("dlD").value;save();render()};
 $("relBtn").onclick=()=>{S.rel[K()]=!rel();save();render()};
 document.querySelectorAll(".rev").forEach(x=>x.textContent="v"+APP_VERSION);
 if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js",{scope:"/conca/"}).catch(()=>{});
-let _bip=null;window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();_bip=e;$("instBtn").hidden=false});
-$("instBtn").onclick=()=>{if(!_bip)return;_bip.prompt();_bip.userChoice.finally(()=>{_bip=null;$("instBtn").hidden=true})};
-if(/iphone|ipad|ipod/i.test(navigator.userAgent)&&!navigator.standalone)$("instIos").hidden=false;
+let _bip=null;const standalone=()=>matchMedia("(display-mode: standalone)").matches||navigator.standalone===true;
+const instClosed=()=>{try{return sessionStorage.getItem("instX")=="1"}catch(e){return false}};
+function showInst(ios){if(standalone()||instClosed())return;$("instBtn").hidden=!!ios;$("instTxt").textContent=ios?"Per installare l'app: in Safari tocca Condividi, poi «Aggiungi alla schermata Home»":"Installa l'app Mensa La Conca Verde";$("instBar").hidden=false}
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();_bip=e;showInst(false)});
+window.addEventListener("appinstalled",()=>{$("instBar").hidden=true;_bip=null});
+$("instBtn").onclick=()=>{if(!_bip)return;_bip.prompt();_bip.userChoice.finally(()=>{_bip=null;$("instBar").hidden=true})};
+$("instX").onclick=()=>{$("instBar").hidden=true;try{sessionStorage.setItem("instX","1")}catch(e){}};
+if(/iphone|ipad|ipod/i.test(navigator.userAgent))setTimeout(()=>showInst(true),1500);
 if(!db)fbErr("Firebase non configurato: compila il file firebase-config.js");
 else{auth.onAuthStateChanged(async u=>{
  accUnsub&&accUnsub();accUnsub=null;ME=null;

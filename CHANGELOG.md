@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.1 — 2026-11-05
+- Installazione come Ergo Plan: barra «Installa» in basso (Android/Chrome) al posto del menu ⋮; su iPhone istruzioni Condividi → Aggiungi alla schermata Home; la barra non compare se l'app è già aperta come app installata e si chiude con ✕.
+
 ## 1.1.0 — 2026-11-04
 - Nome utente automatico: prime tre lettere del nome + prime tre del cognome (es. Mario Rossi → marros), con numero se già usato. Password iniziale 123.
 - Gestori: «Reimposta password» riporta la password a 123 (al primo accesso va cambiata) e «Togli accesso» nella scheda Utenti, senza passare dalla console Firebase.
