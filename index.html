@@ -188,11 +188,11 @@ iframe{width:100%;height:520px;border:1px solid var(--line);border-radius:8px;ba
       <div class="row">
         <select id="rPer" aria-label="Periodo"><option value="d">Giorno selezionato</option><option value="w" selected>Settimana visualizzata</option><option value="m">Mese</option></select>
         <input type="month" id="rMonth" hidden aria-label="Mese">
-        <div class="seg"><label><input type="radio" name="rCnt" value="all" checked> Completo</label><label><input type="radio" name="rCnt" value="sum"> Solo riassunto</label></div>
+        <div class="seg"><label><input type="radio" name="rCnt" value="sum" checked> Consuntivo pasti</label><label><input type="radio" name="rCnt" value="all"> Foglio cucina</label></div>
         <div class="seg"><label><input type="radio" name="rFmt" value="pdf" checked> PDF</label><label><input type="radio" name="rFmt" value="xlsx"> Excel</label></div>
       </div>
       <div class="row"><button class="btn pri" id="rShare">Invia (WhatsApp, Mail…)</button><button class="btn" id="rDown">Scarica</button><span class="toast" id="rMsg"></span></div>
-      <p class="sub"><b>Solo riassunto</b>: per ogni persona i pasti consumati (totale, in azienda, al ristorante). <b>Completo</b>: aggiunge disdette, totali per giorno, piatti e dettaglio delle scelte.</p>
+      <p class="sub"><b>Consuntivo pasti</b>: per ogni persona i pasti consumati nel periodo (totale, in azienda, al ristorante). <b>Foglio cucina</b>: per ogni giorno il totale di ogni piatto e chi ha preso cosa, diviso tra azienda e ristorante; i disdetti sono in fondo solo per informazione.</p>
     </div>
     <iframe id="pdfView" hidden title="Anteprima PDF"></iframe>
   </section>
@@ -503,31 +503,36 @@ function sum3(a){return a.reduce((t,x)=>({A:t.A+x.A,R:t.R+x.R,D:t.D+x.D}),{A:0,R
 const onlySum=()=>document.querySelector('input[name="rCnt"]:checked').value=="sum";
 function makePdfSum(R){const {jsPDF}=window.jspdf,doc=new jsPDF();const H={fillColor:[24,77,47],textColor:[212,180,106]},T={fontStyle:"bold",fillColor:[239,230,200]};
  const P=R.pers.filter(p=>p.A+p.R>0),tp=sum3(P);
- doc.setFontSize(16);doc.text("La Conca Verde – Riassunto pasti",14,16);doc.setFontSize(11);doc.text(R.label.charAt(0).toUpperCase()+R.label.slice(1),14,23);
+ doc.setFontSize(16);doc.text("La Conca Verde – Consuntivo pasti",14,16);doc.setFontSize(11);doc.text(R.label.charAt(0).toUpperCase()+R.label.slice(1),14,23);
  doc.autoTable({startY:30,head:[["Nome","Totale pasti","In azienda","Al ristorante"]],body:[...P.map(p=>[p.nome,p.A+p.R,p.A,p.R]),[{content:"Totale",styles:T},{content:tp.A+tp.R,styles:T},{content:tp.A,styles:T},{content:tp.R,styles:T}]],headStyles:H,columnStyles:{1:{halign:"center",fontStyle:"bold"},2:{halign:"center"},3:{halign:"center"}}});
- return new File([doc.output("blob")],R.fname+"_riassunto.pdf",{type:"application/pdf"})}
+ return new File([doc.output("blob")],R.fname+"_consuntivo.pdf",{type:"application/pdf"})}
 function makeXlsxSum(R){const wb=XLSX.utils.book_new(),P=R.pers.filter(p=>p.A+p.R>0),tp=sum3(P);
- const ws=XLSX.utils.aoa_to_sheet([["Riassunto pasti "+R.label],[],["Nome","Totale pasti","In azienda","Al ristorante"],...P.map(p=>[p.nome,p.A+p.R,p.A,p.R]),["Totale",tp.A+tp.R,tp.A,tp.R]]);
- ws["!cols"]=[{wch:26},{wch:13},{wch:11},{wch:13}];XLSX.utils.book_append_sheet(wb,ws,"Riassunto");
- return new File([XLSX.write(wb,{type:"array",bookType:"xlsx"})],R.fname+"_riassunto.xlsx",{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"})}
+ const ws=XLSX.utils.aoa_to_sheet([["Consuntivo pasti "+R.label],[],["Nome","Totale pasti","In azienda","Al ristorante"],...P.map(p=>[p.nome,p.A+p.R,p.A,p.R]),["Totale",tp.A+tp.R,tp.A,tp.R]]);
+ ws["!cols"]=[{wch:26},{wch:13},{wch:11},{wch:13}];XLSX.utils.book_append_sheet(wb,ws,"Consuntivo");
+ return new File([XLSX.write(wb,{type:"array",bookType:"xlsx"})],R.fname+"_consuntivo.xlsx",{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"})}
+function kDays(R){const m={};R.os.forEach(o=>{const k=dateOf(o).getTime();(m[k]=m[k]||{d:dateOf(o),os:[]}).os.push(o)});return Object.values(m).sort((a,b)=>a.d-b.d)}
+function kDish(os){const C={};os.filter(o=>!o.assente).forEach(o=>CATS.forEach(c=>{if(o.s[c]){const k=c+"|"+o.s[c];const x=C[k]=C[k]||{c,id:o.s[c],A:0,R:0};x[o.dove[0]]++}}));
+ return Object.values(C).sort((a,b)=>CATS.indexOf(a.c)-CATS.indexOf(b.c)||(b.A+b.R)-(a.A+a.R))}
+const byCog=(a,b)=>cog(a.nome).localeCompare(cog(b.nome),"it")||a.nome.localeCompare(b.nome,"it");
 function makePdf(R){const {jsPDF}=window.jspdf,doc=new jsPDF();const H={fillColor:[24,77,47],textColor:[212,180,106]},T={fontStyle:"bold",fillColor:[239,230,200]};
- doc.setFontSize(16);doc.text("La Conca Verde – Riepilogo mensa",14,16);doc.setFontSize(11);doc.text(R.label.charAt(0).toUpperCase()+R.label.slice(1),14,23);
- const tp=sum3(R.pers);doc.setFontSize(10);doc.text(`Pasti ${tp.A+tp.R} · In azienda ${tp.A} · Al ristorante ${tp.R} · Disdetti ${tp.D}`,14,29);
- let y=34;const sec=t=>{doc.setFontSize(12);doc.text(t,14,y);y+=3};
- sec("Pasti per persona");doc.autoTable({startY:y,head:[["Nome","Azienda","Ristorante","Totale pasti","Disdetti"]],body:[...R.pers.map(p=>[p.nome,p.A,p.R,p.A+p.R,p.D||""]),[{content:"Totale",styles:T},{content:tp.A,styles:T},{content:tp.R,styles:T},{content:tp.A+tp.R,styles:T},{content:tp.D,styles:T}]],headStyles:H});
- y=doc.lastAutoTable.finalY+10;
- if(R.giorni.length>1){sec("Pasti per giorno");doc.autoTable({startY:y,head:[["Giorno","Azienda","Ristorante","Totale","Disdetti"]],body:R.giorni.map(g=>[fmtD(g.d),g.A,g.R,g.A+g.R,g.D||""]),headStyles:H});y=doc.lastAutoTable.finalY+10}
- sec("Piatti");doc.autoTable({startY:y,head:[["Portata","Piatto","Azienda","Ristorante","Totale","Disdetti"]],body:R.piatti.map(x=>[cl(x.c),dn(x.id),x.A,x.R,x.A+x.R,x.D||""]),headStyles:H});y=doc.lastAutoTable.finalY+10;
- sec("Dettaglio prenotazioni");doc.autoTable({startY:y,head:[["Giorno","Nome","Dove","Stato",...CATS.map(cl)]],body:R.os.map(o=>[fmtD(dateOf(o)),o.nome,o.dove,o.assente?"Disdetto":"Presente",...CATS.map(c=>o.s[c]?dn(o.s[c]):"—")]),headStyles:H,styles:{fontSize:8}});
- return new File([doc.output("blob")],R.fname+".pdf",{type:"application/pdf"})}
-function makeXlsx(R){const wb=XLSX.utils.book_new(),tp=sum3(R.pers);
- const add=(n,a,w)=>{const ws=XLSX.utils.aoa_to_sheet(a);ws["!cols"]=w.map(x=>({wch:x}));XLSX.utils.book_append_sheet(wb,ws,n)};
- add("Persone",[["Riepilogo "+R.label],[],["Nome","Azienda","Ristorante","Totale pasti","Disdetti"],...R.pers.map(p=>[p.nome,p.A,p.R,p.A+p.R,p.D]),["Totale",tp.A,tp.R,tp.A+tp.R,tp.D]],[26,10,11,13,10]);
- add("Giorni",[["Giorno","Azienda","Ristorante","Totale","Disdetti"],...R.giorni.map(g=>[fmtD(g.d),g.A,g.R,g.A+g.R,g.D])],[16,10,11,10,10]);
- add("Piatti",[["Portata","Piatto","Azienda","Ristorante","Totale","Disdetti"],...R.piatti.map(x=>[cl(x.c),dn(x.id),x.A,x.R,x.A+x.R,x.D])],[14,26,10,11,10,10]);
- add("Dettaglio",[["Data","Nome","Dove","Stato",...CATS.map(cl)],...R.os.map(o=>[dateOf(o).toLocaleDateString("it-IT"),o.nome,o.dove,o.assente?"Disdetto":"Presente",...CATS.map(c=>o.s[c]?dn(o.s[c]):"")])],[12,24,11,10,...CATS.map(()=>22)]);
- const buf=XLSX.write(wb,{type:"array",bookType:"xlsx"});
- return new File([buf],R.fname+".xlsx",{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"})}
+ kDays(R).forEach((g,gi)=>{if(gi)doc.addPage();const os=g.os,az=os.filter(o=>!o.assente&&o.dove=="Azienda").sort(byCog),ri=os.filter(o=>!o.assente&&o.dove=="Ristorante").sort(byCog),di=os.filter(o=>o.assente).sort(byCog);
+  const lab=g.d.toLocaleDateString("it-IT",{weekday:"long",day:"2-digit",month:"long",year:"numeric"});
+  doc.setFontSize(16);doc.text("La Conca Verde – Foglio cucina",14,16);doc.setFontSize(12);doc.text(lab.charAt(0).toUpperCase()+lab.slice(1),14,23);
+  doc.setFontSize(10);doc.text(`Pasti ${az.length+ri.length} · In azienda ${az.length} · Al ristorante ${ri.length}`,14,29);
+  let y=34;const sec=t=>{doc.setFontSize(12);doc.text(t,14,y);y+=3};
+  const D=kDish(os),tA=D.reduce((t,x)=>t+x.A,0),tR=D.reduce((t,x)=>t+x.R,0);
+  sec("Totale piatti");doc.autoTable({startY:y,head:[["Portata","Piatto","Azienda","Ristorante","Totale"]],body:D.map(x=>[cl(x.c),dn(x.id),x.A,x.R,{content:x.A+x.R,styles:{fontStyle:"bold"}}]),headStyles:H,columnStyles:{2:{halign:"center"},3:{halign:"center"},4:{halign:"center"}}});y=doc.lastAutoTable.finalY+10;
+  [["In azienda",az],["Al ristorante",ri]].forEach(([t,L])=>{if(!L.length)return;sec(`${t} (${L.length})`);
+   doc.autoTable({startY:y,head:[["Nome",...CATS.map(cl)]],body:L.map(o=>[o.nome,...CATS.map(c=>o.s[c]?dn(o.s[c]):"—")]),headStyles:H,styles:{fontSize:9}});y=doc.lastAutoTable.finalY+10});
+  if(di.length){doc.setFontSize(9);doc.setTextColor(120);doc.text(doc.splitTextToSize(`Disdetti (solo per informazione, non preparare): ${di.map(o=>o.nome).join(", ")}`,180),14,Math.min(y,285));doc.setTextColor(0)}});
+ return new File([doc.output("blob")],R.fname+"_cucina.pdf",{type:"application/pdf"})}
+function makeXlsx(R){const wb=XLSX.utils.book_new();const add=(n,a,w)=>{const ws=XLSX.utils.aoa_to_sheet(a);ws["!cols"]=w.map(x=>({wch:x}));XLSX.utils.book_append_sheet(wb,ws,n)};
+ const G=kDays(R),P=[["Data","Portata","Piatto","Azienda","Ristorante","Totale"]],W=[["Data","Dove","Nome",...CATS.map(cl)]],X=[["Data","Nome","Dove"]];
+ G.forEach(g=>{const ds=g.d.toLocaleDateString("it-IT");kDish(g.os).forEach(x=>P.push([ds,cl(x.c),dn(x.id),x.A,x.R,x.A+x.R]));
+  ["Azienda","Ristorante"].forEach(dv=>g.os.filter(o=>!o.assente&&o.dove==dv).sort(byCog).forEach(o=>W.push([ds,dv,o.nome,...CATS.map(c=>o.s[c]?dn(o.s[c]):"")])));
+  g.os.filter(o=>o.assente).sort(byCog).forEach(o=>X.push([ds,o.nome,o.dove]))});
+ add("Totale piatti",P,[12,14,26,10,11,10]);add("Chi ha preso cosa",W,[12,11,24,...CATS.map(()=>22)]);add("Disdetti (info)",X,[12,24,11]);
+ return new File([XLSX.write(wb,{type:"array",bookType:"xlsx"})],R.fname+"_cucina.xlsx",{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"})}
 function buildFile(){prepReport();if(!RD.orders){$("rMsg").textContent="Sto caricando i dati, riprova tra un attimo";return null}
  const R=repData();if(!R.os.length){$("rMsg").textContent="Nessuna prenotazione nel periodo scelto";return null}
  const f=document.querySelector('input[name="rFmt"]:checked').value;
